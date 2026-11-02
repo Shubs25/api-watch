@@ -93,4 +93,36 @@ public class MonitoredEndpointService {
         return convertToResponseDTO(entity);
     }
 
+    public MonitoredEndpointResponseDTO updateEndpoint(UUID id, MonitoredEndpointRequestDTO dto) {
+
+        MonitoredEndpointEntity entity = monitoredEndpointDAO.findById(id)
+                                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                             "Endpoint with ID " + id + " not found"
+                                                    ));
+
+        entity.setName(dto.getName());
+        entity.setUrl(dto.getUrl());
+        entity.setMethod(dto.getMethod());
+        entity.setIntervalSeconds(dto.getInterval());
+        entity.setTimeoutMs(dto.getTimeout());
+        entity.setActive(dto.isActive());
+        entity.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+
+        monitoredEndpointDAO.update(entity);
+
+        return convertToResponseDTO(entity);
+    }
+
+    @Transactional
+    public void deleteEndpoint(UUID id) {
+
+        MonitoredEndpointEntity entity =
+                monitoredEndpointDAO.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Endpoint with ID " + id + " not found"
+                        ));
+
+        monitoredEndpointDAO.delete(entity);
+    }
+
 }

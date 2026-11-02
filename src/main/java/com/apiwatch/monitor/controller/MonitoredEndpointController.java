@@ -42,4 +42,22 @@ public class MonitoredEndpointController {
                 monitoredEndpointService.getEndpointById(id)
         );
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<MonitoredEndpointResponseDTO> updateEndpoint(
+            @PathVariable UUID id,
+            @Valid @RequestBody MonitoredEndpointRequestDTO body) {
+
+        return ResponseEntity.ok(
+                monitoredEndpointService.updateEndpoint(id, body)
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteEndpoint(@PathVariable UUID id) {
+
+        monitoredEndpointService.deleteEndpoint(id);
+
+        return ResponseEntity.noContent().build();
+    }
 }
