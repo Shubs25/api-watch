@@ -49,4 +49,12 @@ public class MonitoredEndpointDAO {
                 .setParameter("id", id)
                 .uniqueResultOptional();
     }
+
+    public void update(MonitoredEndpointEntity entity) {
+        sessionFactory.getCurrentSession().merge(entity);
+    }
+
+    public void delete(MonitoredEndpointEntity entity) {
+        sessionFactory.getCurrentSession().remove(entity);
+    }
 }
