@@ -1,0 +1,139 @@
+
+services:
+
+  # ---------------- SQL SERVER ----------------
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: apiwatch-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    restart: unless-stopped
+
+  # ---------------- DATABASE INITIALIZATION ----------------
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: apiwatch-sqlserver-init
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    entrypoint: ["/opt/mssql-tools18/bin/sqlcmd"]
+    command:
+      - -S
+      - tcp:sqlserver,1433
+      - -U
+      - sa
+      - -P
+      - ${MSSQL_SA_PASSWORD}
+      - -C
+      - -d
+      - master
+      - -Q
+      - "IF DB_ID(N'ApiWatchMonitor') IS NULL CREATE DATABASE ApiWatchMonitor; IF DB_ID(N'ApiWatchAnalytics') IS NULL CREATE DATABASE ApiWatchAnalytics;"
+    restart: "no"
+
+  # ---------------- RABBITMQ ----------------
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: apiwatch-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ---------------- MONITOR SERVICE ----------------
+  monitor-service:
+    build:
+      context: .
+      dockerfile: monitor-service/Dockerfile
+    image: apiwatch-monitor
+    container_name: apiwatch-monitor
+    environment:
+      MONITORED_ENDPOINT_DB_HOST: sqlserver
+      MONITORED_ENDPOINT_DB_PORT: 1433
+      MONITORED_ENDPOINT_DB_NAME: ApiWatchMonitor
+      MONITORED_ENDPOINT_DB_USERNAME: ${DB_USERNAME}
+      MONITORED_ENDPOINT_DB_PASSWORD: ${DB_PASSWORD}
+
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    ports:
+      - "8080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------- WORKER SERVICE ----------------
+  worker-service:
+    build:
+      context: .
+      dockerfile: worker-service/Dockerfile
+    image: apiwatch-worker
+    container_name: apiwatch-worker
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------- ANALYTICS SERVICE ----------------
+  analytics-service:
+    build:
+      context: .
+      dockerfile: analytics-service/Dockerfile
+    image: apiwatch-analytics
+    container_name: apiwatch-analytics
+    environment:
+      ANALYTICS_DB_HOST: sqlserver
+      ANALYTICS_DB_PORT: 1433
+      ANALYTICS_DB_NAME: ApiWatchAnalytics
+      ANALYTICS_DB_USERNAME: ${DB_USERNAME}
+      ANALYTICS_DB_PASSWORD: ${DB_PASSWORD}
+
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  sqlserver-data:
+  rabbitmq-data:
