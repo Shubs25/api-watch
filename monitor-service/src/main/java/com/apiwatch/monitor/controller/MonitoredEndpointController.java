@@ -12,6 +12,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/endpoints")
+@CrossOrigin(originPatterns = "http://localhost:*", allowedHeaders = "*")
 public class MonitoredEndpointController {
 
     final MonitoredEndpointService monitoredEndpointService;
