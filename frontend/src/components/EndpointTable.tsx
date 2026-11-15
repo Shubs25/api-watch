@@ -11,7 +11,7 @@ import type { Endpoint } from '../type/endpoint'
 // }
 
 type EndpointTableProps = {
-    endpoints: Endpoint[]
+    endpoints: Endpoint[];
     onCheck: (endpointId: string) => Promise<void>
 }
 
